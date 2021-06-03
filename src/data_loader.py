@@ -11,13 +11,14 @@ from src.utils import sequence_padding, fine_grad_tokenize, flat_list
 
 
 class SpanDataset(Dataset):
-    def __init__(self, data, label2id, tokenizer=None, max_len=128, neg_rate=0.7):
+    def __init__(self, data, label2id, tokenizer=None, max_len=128, neg_rate=0.7, is_dev=False):
         super(SpanDataset).__init__()
         self.data = data
         self.tokenizer = tokenizer
         self.max_len = max_len
         self.label2id = label2id
         self.neg_rate = neg_rate
+        self.is_dev = is_dev
 
     def __len__(self):
         return len(self.data)
@@ -36,10 +37,13 @@ class SpanDataset(Dataset):
             """
 
             batch_token_ids, batch_segment_ids, batch_attention_mask, batch_position, batch_label = [], [], [], [], []
-
+            lengths = []
             for idx, d in enumerate(examples):
                 text = d['text']
                 tokens = fine_grad_tokenize(text, self.tokenizer)
+
+                lengths.append(len(tokens))
+
                 inputs = self.tokenizer.encode_plus(text=tokens)
 
                 token_ids = inputs['input_ids']
@@ -47,15 +51,16 @@ class SpanDataset(Dataset):
                 attention_mask = inputs['attention_mask']
 
                 positions = [(l[0], l[1]) for l in d['label']]
-                labels = [self.label2id[l] for l in d['label']]
+                labels = [self.label2id[l[2]] for l in d['label']]
 
                 neg_positions = self.generate_whole_label(positions=positions, length=len(text))
 
                 batch_token_ids.append(token_ids)
                 batch_segment_ids.append(segment_ids)
                 batch_attention_mask.append(attention_mask)
-                batch_position.append(positions + neg_positions)
-                batch_label.append(labels + [0] * len(neg_positions))
+
+                batch_position.extend([(idx,) + p for p in positions + neg_positions])
+                batch_label.extend(labels + [0] * len(neg_positions))
 
             # padding
             batch_token_ids = sequence_padding(batch_token_ids)
@@ -63,7 +68,10 @@ class SpanDataset(Dataset):
             batch_attention_mask = sequence_padding(batch_attention_mask)
             batch_label = torch.tensor(batch_label, dtype=torch.long)
 
-            return [batch_token_ids, batch_segment_ids, batch_attention_mask, batch_position, batch_label]
+            if self.is_dev:
+                return [batch_token_ids, batch_segment_ids, batch_attention_mask, lengths, batch_label]
+            else:
+                return [batch_token_ids, batch_segment_ids, batch_attention_mask, batch_position, batch_label]
 
         return partial(collate)
 

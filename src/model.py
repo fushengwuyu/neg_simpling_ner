@@ -55,7 +55,7 @@ class SpanNER(nn.Module):
         super(SpanNER, self).__init__()
         self.num_labels = num_labels
         print('mhs with bert')
-        self.bert = AutoModel.from_pretrained(args.bert_model, output_hidden_states=True)
+        self.bert = AutoModel.from_pretrained(args.bert_model_path, output_hidden_states=True)
 
         classifier_hidden = args.hidden_size * 4
         self._activator = nn.Sequential(nn.Linear(classifier_hidden, classifier_hidden),
@@ -68,13 +68,13 @@ class SpanNER(nn.Module):
             input_ids=token_ids,
             attention_mask=attention_mask,
             token_type_ids=segment_ids
-        )[0][1:-1]
+        )[0][:, 1:-1, :]
 
         batch_size, token_num, hidden_dim = share_encoder.size()
 
         ext_row = share_encoder.unsqueeze(2).expand(batch_size, token_num, token_num, hidden_dim)
         ext_column = share_encoder.unsqueeze(1).expand_as(ext_row)
         table = torch.cat([ext_row, ext_column, ext_row - ext_column, ext_row * ext_column], dim=-1)
-        score_t = self._classifier(table)
+        score_t = self._activator(self._dropout(table))
 
         return score_t

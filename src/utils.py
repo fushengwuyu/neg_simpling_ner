@@ -20,7 +20,10 @@ def load_data(path):
             fields = l.strip('\n').split('|||')
             if len(fields[0]) > 510:
                 continue
-            D.append({"text": fields[0], "label": [i.split('    ') for i in fields[1:] if i]})
+
+            label = [i.split('    ') for i in fields[1:] if i]
+            label = [[int(l[0]), int(l[1]), l[2]] for l in label]
+            D.append({"text": fields[0], "label": label})
     print(i)
     return D
 
@@ -70,6 +73,7 @@ def fine_grad_tokenize(text, tokenizer):
                 tokens.append('[INV]')
             else:
                 tokens.append(_ch)
+    return tokens
 
 
 def flat_list(nest_list):
@@ -82,7 +86,7 @@ def flat_list(nest_list):
 
 if __name__ == '__main__':
     train_data = load_data('../dataset/o_data/train_data.txt')
-    dev_data = load_data('../dataset/o_data/val_data.txt')
+    dev_data = load_data('../dataset/o_data/valid_data.txt')
     print(train_data[0])
     l = [len(t['text']) for t in train_data]
     d = [len(t['text']) for t in dev_data]
