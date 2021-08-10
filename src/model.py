@@ -68,7 +68,7 @@ class SpanNER(nn.Module):
             input_ids=token_ids,
             attention_mask=attention_mask,
             token_type_ids=segment_ids
-        )[0][:, 1:-1, :]
+        )[0]
 
         batch_size, token_num, hidden_dim = share_encoder.size()
 

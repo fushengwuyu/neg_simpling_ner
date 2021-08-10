@@ -27,50 +27,52 @@ class SpanDataset(Dataset):
         return self.data[index]
 
     def _create_collate_fn(self):
-        def collate(examples):
-            """
-                {
-                    'text': '（5）房室结消融和起搏器植入作为反复发作或难治性心房内折返性心动过速的替代疗法。',
-                    'label': [['3', '7', 'pro'], ['9', '13', 'pro'], ['16', '33', 'dis']]
-                }
+        def find_index(offset_mapping, index, is_start=True):
+            for i, offset in enumerate(offset_mapping):
+                if is_start:
+                    if offset[0] <= index < offset[1]:
+                        return i
+            return -1
 
-            """
+        def collate(examples):
 
             batch_token_ids, batch_segment_ids, batch_attention_mask, batch_position, batch_label = [], [], [], [], []
             lengths = []
             for idx, d in enumerate(examples):
-                text = d['text']
-                tokens = fine_grad_tokenize(text, self.tokenizer)
-
-                lengths.append(len(tokens))
-
-                inputs = self.tokenizer.encode_plus(text=tokens)
+                text, entities = d
+                inputs = self.tokenizer(text, return_offsets_mapping=True)
 
                 token_ids = inputs['input_ids']
                 segment_ids = inputs['token_type_ids']
                 attention_mask = inputs['attention_mask']
+                offset_mapping = inputs['offset_mapping']
+                lengths.append(len(token_ids))
 
-                positions = [(l[0], l[1]) for l in d['label']]
-                labels = [self.label2id[l[2]] for l in d['label']]
+                pos_positions = [(find_index(offset_mapping, l[0]), find_index(offset_mapping, l[1] - 1)) for l in
+                                 entities]
+                labels = [self.label2id[l[2]] for l in entities]
 
-                neg_positions = self.generate_whole_label(positions=positions, length=len(text))
+                neg_positions = self.generate_whole_label(positions=pos_positions, length=len(token_ids))
 
                 batch_token_ids.append(token_ids)
                 batch_segment_ids.append(segment_ids)
                 batch_attention_mask.append(attention_mask)
 
-                batch_position.extend([(idx,) + p for p in positions + neg_positions])
-                batch_label.extend(labels + [0] * len(neg_positions))
+                batch_position.extend([(idx,) + p for p in pos_positions + neg_positions])
+                if not self.is_dev:
+                    batch_label.extend(labels + [0] * len(neg_positions))
+                else:
+                    batch_label.extend([[idx, p[0], p[1], l] for p, l in zip(pos_positions, labels)])
 
             # padding
             batch_token_ids = sequence_padding(batch_token_ids)
             batch_segment_ids = sequence_padding(batch_segment_ids)
             batch_attention_mask = sequence_padding(batch_attention_mask)
-            batch_label = torch.tensor(batch_label, dtype=torch.long)
 
             if self.is_dev:
                 return [batch_token_ids, batch_segment_ids, batch_attention_mask, lengths, batch_label]
             else:
+                batch_label = torch.tensor(batch_label, dtype=torch.long)
                 return [batch_token_ids, batch_segment_ids, batch_attention_mask, batch_position, batch_label]
 
         return partial(collate)

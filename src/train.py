@@ -21,11 +21,10 @@ class Trainer(object):
 
         self.args = args
         self.device = torch.device("cuda:{}".format(args.device_id) if torch.cuda.is_available() else "cpu")
-
         self.id2label = {item: key for key, item in label2id.items()}
 
         self.model = SpanNER(args, len(label2id))
-
+        print(self.model)
         self.model.to(self.device)
         if args.train_mode != "train":
             self.resume(args)
@@ -57,7 +56,7 @@ class Trainer(object):
 
         best_f1 = 0
         self.model.train()
-        step_gap, eval_gap = 20, 500
+        step_gap, eval_gap = 2, 3
         for epoch in range(int(args.epoch_num)):
 
             global_loss, gap_loss = 0.0, 0.0
@@ -127,12 +126,12 @@ class Trainer(object):
             idx_table = idx_table.cpu().numpy()
             bs, ss, es = np.where(idx_table != 0)
 
-            entities = [[] for i in range(len(lengths))]
+            entities = []
             for b, s, e in zip(bs, ss, es):
                 l = lengths[b]
                 if s > e or s >= l or e >= l:
                     continue
-                entities[b].append([s, e, self.id2label[l]])
+                entities.append([b, s, e, idx_table[b, s, e]])
 
             return entities
 
@@ -153,3 +152,4 @@ class Trainer(object):
         p, r, f1 = A / B, A / C, 2 * A / (B + C)
         self.model.train()
         return {'f1': f1, "recall": r, "precision": p}
+

@@ -36,7 +36,7 @@ def get_args():
     parser.add_argument("--warmup_proportion", default=0.1, type=float,
                         help="Proportion of training to perform linear learning rate warmup for. E.g., 0.1 = 10%% "
                              "of training.")
-    parser.add_argument("--bert_model_path", default='/home/sunshine/pre_models/pytorch/albert_chinese_tiny',
+    parser.add_argument("--bert_model_path", default='/home/zmw/pre_models/pytorch/albert_chinese_tiny',
                         type=str,
                         help="Bert pre-trained model selected in the list: bert-base-uncased, "
                              "bert-large-uncased, bert-base-cased, bert-large-cased, bert-base-multilingual-uncased, "
